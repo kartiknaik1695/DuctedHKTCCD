@@ -14,42 +14,46 @@ class failureComp(om.ExplicitComponent):
         # Inputs
         self.add_input("time_phase", units='s', val=np.ones(nn))
         self.add_input('slope', units=None, val=1.0)
-        self.add_output('failuredot', val=np.ones(nn), desc='derivative of base failure rate', units='1.0/s')
+        self.add_output('Pfail', val=np.ones(nn), desc='derivative of base failure rate', units='1.0/s')
 
         # Setup partials
         arange = np.arange(nn)
-        self.declare_partials(of="failuredot", wrt="time_phase", rows=arange, cols=arange)
+        self.declare_partials(of="Pfail", wrt="time_phase", rows=arange, cols=arange)
 
     def compute(self, inputs, outputs):
 
         time = inputs["time_phase"]
         a = inputs["slope"]
-        outputs['failuredot'] = 1-np.exp(-a*time)
+        outputs['Pfail'] = time+1/a*np.exp(-a*time)
 
     def compute_partials(self, inputs, partials):
 
         time = inputs["time_phase"]
         a = inputs["slope"]
 
-        partials["failuredot", "time_phase"] = 1-np.exp(-a*time) * (-np.exp(-a*time)) * (-a)
+        partials["Pfail", "time_phase"] = 1-np.exp(-a*time)
 
 
 class TimeAverage(om.ExplicitComponent):
     def initialize(self):
-        self.options.declare('num_nodes', types=int,
-                             desc='Number of nodes to be evaluated in the RHS')
+        self.options.declare('state_nodes', types=int,
+                             desc='Number of state nodes to be evaluated in the RHS')
+
+        self.options.declare('control_nodes', types=int,
+                             desc='Number of control nodes to be evaluated in the RHS')
 
     def setup(self):
 
-        nn = self.options['num_nodes']
+        n_state = self.options['state_nodes']
+        n_control = self.options['control_nodes']
         # Inputs
-        self.add_input('x', val=np.zeros(nn), desc='velocity', units='rad/s')
-        self.add_input('u', val=np.ones(nn), desc='control', units=None)
+        self.add_input('x', val=np.zeros(n_state), desc='velocity', units='rad/s')
+        self.add_input('u', val=np.ones(n_control), desc='control', units=None)
         self.add_output('Fomega', val=1.0, desc='omega dependent failure', units=None)
         self.add_output('Fu', val=1.0, desc='u dependent failure', units=None)
 
         # Setup partials
-        self.declare_partials(of="Fomega", wrt="omega", method="fd")
+        self.declare_partials(of="Fomega", wrt="x", method="fd")
         self.declare_partials(of="Fu", wrt="u", method="fd")
 
     def compute(self, inputs, outputs):
@@ -85,9 +89,10 @@ class TechnoEco(om.ExplicitComponent):
         
         self.add_output('LCOE', val=0.5, desc='levelized cost of energy', units=None)
         # Setup partials
-        self.declare_partials(of="LCOE", wrt="x", method = 'fd')
-        self.declare_partials(of="LCOE", wrt="u", method = 'fd')
-        self.declare_partials(of="LCOE", wrt="Jdot", method = 'fd')
+        self.declare_partials(of="LCOE", wrt="Fomega", method = 'fd')
+        self.declare_partials(of="LCOE", wrt="Fu", method = 'fd')
+        self.declare_partials(of="LCOE", wrt="Pfail", method = 'fd')
+        self.declare_partials(of="LCOE", wrt="Egen", method = 'fd')
         
     def compute(self, inputs, outputs):
 
@@ -111,7 +116,7 @@ class TechnoEco(om.ExplicitComponent):
 
         Pmax = 5000
         
-        Pfail = inputs["failure"]
+        Pfail = inputs["Pfail"]
         
         # Add normalized costs
         C1 = 2.5*0.082

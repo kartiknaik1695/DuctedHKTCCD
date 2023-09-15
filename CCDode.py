@@ -60,8 +60,8 @@ class TurbineODE(om.Group):
 
     def setup(self):
         nn = self.options['num_nodes']
-        self.add_subsystem('torque_comp', Computation(num_nodes=nn), promotes_inputs=['x'])
+        self.add_subsystem('torque_comp', Computation(num_nodes=nn), promotes_inputs=['x'], promotes_outputs=["Pfail"])
         self.add_subsystem('ode_comp', Turbine(num_nodes=nn), promotes_inputs=['u', 'x'], promotes_outputs=['xdot', 'Jdot'])
         self.connect('torque_comp.torque', 'ode_comp.torque')
-        self.add_subsystem('failureComp', failureComp(num_nodes=nn), promotes_outputs=["failuredot"])
+        # self.add_subsystem('failureComp', failureComp(num_nodes=nn), promotes_outputs=["failuredot"])
         # self.connect('Jdot', 'lcoe_comp.Jdot')

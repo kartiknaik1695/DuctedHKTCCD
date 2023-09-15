@@ -18,22 +18,21 @@ class Computation(om.ExplicitComponent):
         nn = self.options['num_nodes']
         self.add_input('x', val=np.zeros(nn), desc='velocity', units='rad/s')
         self.add_input('xdata', val=np.zeros(6))
-        
         self.add_input('time_phase', units='s', val=np.ones(nn))
+        
         self.add_output('torque', val=np.ones(nn))
-
+        self.add_output('Pfail', val=np.ones(nn), desc='failure rate', units='1.0/s')
 
         r = np.arange(nn)
 
         self.declare_partials('torque', ['x', 'time_phase'], rows=r, cols=r, method = 'fd')
         self.declare_partials("torque", "xdata",method = 'fd')
         
-
-
     def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
 
         
         nn = self.options['num_nodes']
+        a = 1
         
 
         xdata = inputs['xdata']
@@ -65,6 +64,7 @@ class Computation(om.ExplicitComponent):
         Tau = 0.5*rho*A*(CpVec/Omega)*np.power(Uinf,3)        
         
         outputs['torque'] = Tau
+        outputs['Pfail'] = time+1/a*np.exp(-a*time)
 
     # def compute_partials(self, inputs, partials):
         
