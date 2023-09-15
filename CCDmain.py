@@ -6,6 +6,7 @@ from CCDode import TurbineODE
 import matplotlib.pyplot as plt
 import timeit
 from curvature import curvature
+from Techno import TimeAverage, TechnoEco
 
 # Define a Dymos problem
 prob = om.Problem()
@@ -54,6 +55,9 @@ phase.add_state('J', fix_initial=True, fix_final=False, lower=0,
                 rate_source='Jdot',
                 units=None, ref=1e5)
 
+phase.add_state('Pfail', fix_initial=True, fix_final=False, rate_source='failuredot',
+                units=None)
+
 phase.add_control(name='u', units=None, lower=0, upper=800, continuity=True,
                   rate_continuity=True, targets='u', ref=0.5e3)
 
@@ -73,16 +77,25 @@ phase.set_time_options(fix_initial=True, fix_duration=True, duration_val=t_final
 
 prob.model.add_subsystem("curvature", curvature(), promotes_outputs=["curvature"])
 prob.model.add_constraint("curvature", lower = 0)
+prob.model.add_subsystem("averageBase", TimeAverage(num_nodes=num_seg))
+prob.model.add_subsystem("lcoe", TechnoEco(), promotes_outputs=["LCOE"])
 
+prob.model.connect("traj.phase0.states:J", "lcoe.Egen", src_indices=[-1])
+prob.model.connect("traj.phase0.states:Pfail", "lcoe.Pfail", src_indices=[-1])
+prob.model.connect("traj.phase0.states:x", "averageBase.x")
+prob.model.connect("traj.phase0.controls:u", "averageBase.u")
+prob.model.connect("averageBase.Fomega", "lcoe.Fomega")
+prob.model.connect("averageBase.Fu", "lcoe.Fu")
 
 # Define objective function
 # ref = -1.0: maximize J
-phase.add_objective('J', loc='final', ref=-1.0e5)
+# phase.add_objective('J', loc='final', ref=-1.0e5)
 # phase.add_objective('LCOE', loc='final', ref=-1.0e5)
 # phase.add_objective('LCOE', ref=-1)
 phase.add_timeseries_output('torque_comp.torque')
-phase.add_timeseries_output('lcoe_comp.LCOE')
-prob.setup()
+# phase.add_timeseries_output('lcoe_comp.LCOE')
+prob.model.add_objective("")
+prob.setup(check=True)
 
 # Problem initialization
 prob['traj.phase0.t_initial'] = 0.0
